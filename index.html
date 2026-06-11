@@ -1,0 +1,380 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Estoque de Chapas — Controle Industrial</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+<header class="cabecalho">
+  <div class="cabecalho__linha">
+    <div>
+      <p class="cabecalho__eyebrow">Controle Industrial</p>
+      <h1 class="cabecalho__titulo">Estoque de Chapas</h1>
+    </div>
+    <div class="header-date" id="headerDate"></div>
+  </div>
+</header>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="setView('dashboard')" id="nav-dashboard">📊 Dashboard</button>
+  <button class="nav-btn" onclick="setView('mapeamento')" id="nav-mapeamento">🗺️ Mapeamento</button>
+  <button class="nav-btn" onclick="setView('historico')" id="nav-historico">🗂️ Histórico</button>
+  <button class="nav-btn" onclick="setView('calc')" id="nav-calc">🧮 Calculadora</button>
+  <button class="nav-btn" onclick="requestAdminAccess()" id="nav-admin">🔐 Cadastrar Chapas</button>
+  <button class="nav-btn" onclick="setView('pdfs')" id="nav-pdfs">📄 Desenhos Técnicos</button>
+  <button class="nav-btn" onclick="setView('pecas')" id="nav-pecas">⚙️ Peças por Chapa</button>
+</nav>
+
+<main class="main">
+
+  <!-- DASHBOARD -->
+  <div id="view-dashboard">
+    <div class="section-label">Resumo por Material</div>
+    <div class="mat-grid" id="matCards"></div>
+
+    <div class="section-label">
+      <div class="stock-header">
+        <span>Estoque Atual</span>
+        <div class="filter-tabs" id="filterTabs"></div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Material</th><th>Código</th><th>Espessura</th>
+            <th>Estoque (kg)</th><th>Qtd. Metros</th>
+            <th style="text-align:center">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="stockTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- MAPEAMENTO -->
+  <div id="view-mapeamento" class="hidden">
+    <div class="section-label">Mapeamento de Prateleiras</div>
+    <div class="mapping-wrap">
+      <div class="mapping-header-row">
+        <div style="text-align:center">PRAT.</div>
+        <div>CHAPA</div>
+        <div style="text-align:center">QUANTIDADE</div>
+        <div style="text-align:right">PESO (kg)</div>
+      </div>
+      <div id="mappingBody"></div>
+      <div class="mapping-legend" id="mappingLegend"></div>
+    </div>
+  </div>
+
+  <!-- HISTÓRICO -->
+  <div id="view-historico" class="hidden">
+    <div class="hist-tabs">
+      <button class="hist-tab active" onclick="setHistTab('entrada')" id="htab-entrada">📥 Entradas</button>
+      <button class="hist-tab" onclick="setHistTab('saida')" id="htab-saida">📤 Saídas</button>
+    </div>
+    <div class="hist-filters">
+      <label class="field" style="flex:1 1 120px">Material
+        <select class="finput" id="hf-material" onchange="renderHistory()">
+          <option value="">Todos</option>
+          <option>INOX</option><option>CARBONO</option><option>ZINCADA</option><option>PERFURADA</option><option>LATÃO</option>
+        </select>
+      </label>
+      <label class="field" style="flex:1 1 80px">Mês
+        <select class="finput" id="hf-mes" onchange="renderHistory()">
+          <option value="">Todos</option>
+          <option value="01">Jan</option><option value="02">Fev</option><option value="03">Mar</option>
+          <option value="04">Abr</option><option value="05">Mai</option><option value="06">Jun</option>
+          <option value="07">Jul</option><option value="08">Ago</option><option value="09">Set</option>
+          <option value="10">Out</option><option value="11">Nov</option><option value="12">Dez</option>
+        </select>
+      </label>
+      <label class="field" style="flex:1 1 90px">Ano
+        <select class="finput" id="hf-ano" onchange="renderHistory()">
+          <option value="">Todos</option>
+          <option value="2025">2025</option><option value="2026">2026</option>
+        </select>
+      </label>
+      <label class="field" style="flex:1 1 140px;display:none" id="hf-sol-wrap">Solicitante
+        <input class="finput" id="hf-solicitante" placeholder="Buscar..." oninput="renderHistory()"/>
+      </label>
+    </div>
+    <div class="table-wrap">
+      <table><thead id="histHead"></thead><tbody id="histTable"></tbody></table>
+    </div>
+    <div class="hist-empty hidden" id="histEmpty">Nenhuma movimentação encontrada.</div>
+  </div>
+
+  <!-- CALCULADORA -->
+  <div id="view-calc" class="hidden">
+    <div class="section-label">Calculadora de Peso — Regra de 3</div>
+    <div class="calc-standalone">
+      <div class="form-row full">
+        <label class="field">Selecionar chapa cadastrada
+          <select class="finput" id="calcSelect" onchange="calcAutoFill()">
+            <option value="">-- Preencher automaticamente --</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="field">Peso base (kg)
+          <input class="finput" type="number" id="calcPeso" placeholder="Ex: 36.1" oninput="calcUpdate()"/>
+        </label>
+        <label class="field">Comprimento base (m)
+          <input class="finput" type="number" id="calcBase" placeholder="Ex: 2" oninput="calcUpdate()"/>
+        </label>
+      </div>
+      <label class="field" style="margin-bottom:4px">Comprimento utilizado (m)
+        <input class="finput" type="number" id="calcUsado" placeholder="Ex: 3" oninput="calcUpdate()"/>
+      </label>
+      <div class="calc-big" id="calcResult">— <span>kg</span></div>
+      <div class="calc-formula-text" id="calcFormula"></div>
+    </div>
+  </div>
+
+  <!-- CADASTRAR CHAPAS (Admin) -->
+  <div id="view-admin" class="hidden">
+    <div class="section-label">Cadastrar Nova Chapa</div>
+    <div class="calc-standalone" style="max-width:600px">
+      <div class="form-row">
+        <label class="field">Material *
+          <select class="finput" id="cad-material">
+            <option value="">Selecionar...</option>
+            <option>INOX</option><option>CARBONO</option><option>ZINCADA</option><option>PERFURADA</option><option>LATÃO</option>
+          </select>
+        </label>
+        <label class="field">Código (ex: MP0000XXX) *
+          <input class="finput" id="cad-codigo" placeholder="MP0000000"/>
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="field">Espessura (ex: 1,5 mm) *
+          <input class="finput" id="cad-espessura" placeholder="1,5 mm"/>
+        </label>
+        <label class="field">Prateleira (A–J ou -)
+          <input class="finput" id="cad-prateleira" placeholder="Ex: B"/>
+        </label>
+      </div>
+      <div class="form-row">
+        <label class="field">Comprimento padrão (m) *
+          <input class="finput" type="number" id="cad-comp" placeholder="Ex: 2"/>
+        </label>
+        <label class="field">Peso padrão (kg) *
+          <input class="finput" type="number" id="cad-peso" placeholder="Ex: 36.1"/>
+        </label>
+      </div>
+      <div class="form-row full">
+        <label class="field">Estoque inicial (kg)
+          <input class="finput" type="number" id="cad-estoque" placeholder="0"/>
+        </label>
+      </div>
+      <button class="btn-primary btn-green" onclick="cadastrarChapa()" style="margin-top:8px">➕ Cadastrar Chapa</button>
+    </div>
+
+    <div class="section-label" style="margin-top:28px">Chapas Cadastradas — Gerenciar</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>Material</th><th>Código</th><th>Espessura</th><th>Comp.(m)</th><th>Peso Padrão(kg)</th><th>Estoque(kg)</th><th>Prat.</th><th style="text-align:center">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="adminTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- DESENHOS TÉCNICOS (PDF) -->
+  <div id="view-pdfs" class="hidden">
+    <div class="section-label">Desenhos Técnicos — PDFs</div>
+
+    <div id="pdf-admin-banner" class="pdf-admin-notice hidden">
+      🔐 Logado como administrador — você pode adicionar e remover desenhos.
+    </div>
+
+    <div style="margin-bottom:14px">
+      <input class="pecas-search" id="pdfSearch" placeholder="🔍 Buscar desenho técnico pelo nome..." oninput="renderPdfs()" style="max-width:400px"/>
+    </div>
+
+    <div id="pdf-upload-area" class="hidden">
+      <div class="pdf-upload-zone" id="pdfDropZone"
+           onclick="document.getElementById('pdfFileInput').click()"
+           ondragover="event.preventDefault();this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handlePdfDrop(event)">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0366a5" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        <div class="pdf-upload-title">Clique ou arraste um PDF aqui</div>
+        <div class="pdf-upload-sub">Apenas arquivos .pdf · Máximo 8MB</div>
+      </div>
+      <input type="file" id="pdfFileInput" accept=".pdf" style="display:none" onchange="handlePdfSelect(event)"/>
+      <div id="pdf-status-msg" style="display:none;text-align:center;padding:8px;font-size:13px;font-weight:600;border-radius:6px;background:var(--bg3);margin-top:8px"></div>
+    </div>
+
+    <div class="pdf-grid" id="pdfGrid"></div>
+    <div class="pdf-empty hidden" id="pdfEmpty">
+      <div style="font-size:36px;margin-bottom:10px">📂</div>
+      <div style="font-weight:600;margin-bottom:4px">Nenhum desenho técnico cadastrado.</div>
+      <div style="font-size:12px">Administradores podem adicionar PDFs acima.</div>
+    </div>
+  </div>
+
+  <!-- PEÇAS POR CHAPA -->
+  <div id="view-pecas" class="hidden">
+    <div class="section-label">Cadastro de Peças por Chapa</div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <input class="pecas-search" id="pecasSearch" placeholder="🔍 Buscar por código de peça ou chapa..." oninput="renderPecas()"/>
+      <button class="btn-primary btn-green" style="width:auto;padding:10px 20px;margin:0" onclick="openPecaModal()">➕ Cadastrar Peça</button>
+    </div>
+
+    <div class="pecas-grid" id="pecasGrid"></div>
+    <div class="pecas-empty hidden" id="pecasEmpty">
+      <div style="font-size:36px;margin-bottom:10px">⚙️</div>
+      <div style="font-weight:600">Nenhuma peça cadastrada ainda.</div>
+      <div style="font-size:12px;margin-top:4px">Use o botão acima para registrar quantas peças cabem por chapa.</div>
+    </div>
+  </div>
+
+
+</main>
+
+<!-- MODAL PEÇA -->
+<div class="modal-overlay hidden" id="modalPeca">
+  <div class="modal" style="max-width:500px">
+    <button class="modal-close" onclick="closeModal('modalPeca')">✕</button>
+    <div class="modal-title" id="pecaModalTitle">➕ Cadastrar Peça por Chapa</div>
+    <div class="modal-sub">Informe quantas peças cabem em uma chapa.</div>
+    <div class="form-row full">
+      <label class="field">Código da Peça (ex: SA0001995) *
+        <input class="finput" id="peca-codigo" placeholder="SA0000000" style="font-family:'DM Mono',monospace;text-transform:uppercase"/>
+      </label>
+    </div>
+    <div class="form-row">
+      <label class="field">Chapa usada (código) *
+        <select class="finput" id="peca-chapa"></select>
+      </label>
+      <label class="field">Quantidade de peças *
+        <input class="finput" type="number" id="peca-qtd" placeholder="Ex: 314" min="1"/>
+      </label>
+    </div>
+    <div class="form-row full">
+      <label class="field">Comprimento de chapa usado (m) — opcional
+        <input class="finput" type="number" id="peca-comp-usado" placeholder="Ex: 3"/>
+      </label>
+    </div>
+    <div class="form-row full">
+      <label class="field">Observação
+        <input class="finput" id="peca-obs" placeholder="Ex: corte laser, nesting..."/>
+      </label>
+    </div>
+    <input type="hidden" id="peca-edit-id"/>
+    <button class="btn-primary btn-green" onclick="salvarPeca()" style="margin-top:6px">💾 Salvar</button>
+  </div>
+</div>
+
+<!-- MODAL SENHA ADMIN -->
+<div class="modal-overlay hidden" id="modalAdmin">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalAdmin')">✕</button>
+    <div class="modal-title">🔐 Acesso Restrito</div>
+    <div class="modal-sub">Digite a senha de administrador para continuar.</div>
+    <div class="form-row full">
+      <label class="field">Senha
+        <input class="finput" type="password" id="admin-senha" placeholder="••••••" onkeydown="if(event.key==='Enter')verificarSenha()"/>
+      </label>
+    </div>
+    <div id="admin-erro" style="color:#d32f2f;font-size:12px;margin-bottom:8px;display:none">Senha incorreta. Tente novamente.</div>
+    <button class="btn-primary btn-green" onclick="verificarSenha()">Entrar</button>
+  </div>
+</div>
+
+<!-- MODAL EXCLUIR CHAPA -->
+<div class="modal-overlay hidden" id="modalExcluir">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalExcluir')">✕</button>
+    <div class="modal-title">⚠️ Excluir Chapa</div>
+    <div class="modal-sub" id="excluirSub">Tem certeza que deseja excluir esta chapa?</div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="btn-primary btn-danger" onclick="confirmarExcluir()" style="flex:1">Sim, excluir</button>
+      <button class="btn-primary" onclick="closeModal('modalExcluir')" style="flex:1;background:var(--bg2);color:var(--text);border:1.5px solid var(--border)">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODAL ENTRADA -->
+<div class="modal-overlay hidden" id="modalEntrada">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalEntrada')">✕</button>
+    <div class="modal-title">📥 Entrada de Material</div>
+    <div class="modal-sub" id="entradaSub"></div>
+    <div class="form-row full">
+      <label class="field">Metragem recebida (m) *
+        <input class="finput" type="number" id="ent-metros" placeholder="Ex: 3" oninput="entradaCalc()"/>
+      </label>
+    </div>
+    <div class="calc-preview hidden" id="entradaPreview">
+      <div class="calc-label" id="entradaPreviewLabel"></div>
+      <div class="calc-result" id="entradaPreviewKg">—</div>
+    </div>
+    <div class="form-row full">
+      <label class="field">Prateleira onde foi colocada (A–J)
+        <input class="finput" id="ent-prateleira" placeholder="Ex: B, C, D..."/>
+      </label>
+    </div>
+    <div class="form-row full">
+      <label class="field">Observação (opcional)
+        <input class="finput" id="ent-obs" placeholder="Opcional..."/>
+      </label>
+    </div>
+    <button class="btn-primary btn-green" onclick="confirmarEntrada()">✅ Confirmar Entrada</button>
+  </div>
+</div>
+
+<!-- MODAL SAÍDA -->
+<div class="modal-overlay hidden" id="modalSaida">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modalSaida')">✕</button>
+    <div class="modal-title">📤 Saída de Material</div>
+    <div class="modal-sub" id="saidaSub"></div>
+    <div class="form-row full">
+      <label class="field">Comprimento utilizado (m) *
+        <input class="finput" type="number" id="sai-metros" placeholder="Ex: 1.5" oninput="saidaCalc()"/>
+      </label>
+    </div>
+    <div class="calc-preview hidden" id="saidaPreview">
+      <div class="calc-label" id="saidaPreviewLabel"></div>
+      <div class="calc-result" id="saidaPreviewKg">—</div>
+    </div>
+    <div class="form-row full">
+      <label class="field">Ajuste manual de peso (kg) — opcional
+        <input class="finput" type="number" id="sai-manual" placeholder="Deixe vazio para usar o calculado"/>
+      </label>
+    </div>
+    <div class="form-row">
+      <label class="field">Destino *
+        <select class="finput" id="sai-destino">
+          <option>Produção</option><option>Desenvolvimento</option><option>Gabaritos / Melhorias</option>
+        </select>
+      </label>
+      <label class="field">Solicitante
+        <input class="finput" id="sai-solicitante" placeholder="Nome (opcional)"/>
+      </label>
+    </div>
+    <div class="form-row full">
+      <label class="field">Descrição do uso
+        <input class="finput" id="sai-descricao" placeholder="Ex: Peça nº 432, corte laser..."/>
+      </label>
+    </div>
+    <button class="btn-primary btn-danger" onclick="confirmarSaida()">📤 Confirmar Saída</button>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
